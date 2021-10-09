@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<head>
+<link rel="stylesheet" href="index.css">
+</head>
+<body>
+    <div id=vis class="centered"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.2.2/d3.v3.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3-cloud/1.2.5/d3.layout.cloud.min.js" integrity="sha512-HjKxWye8lJGPu5q1u/ZYkHlJrJdm6KGr89E6tOrXeKm1mItb1xusPU8QPcKVhP8F9LjpZT7vsu1Fa+dQywP4eg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script>
+
+//Simple animated example of d3-cloud - https://github.com/jasondavies/d3-cloud
+//Based on https://github.com/jasondavies/d3-cloud/blob/master/examples/simple.html
+
+// Encapsulate the word cloud functionality
+function wordCloud(selector) {
+
+    var fill = d3.scale.category20();
+
+    //Construct the word cloud's SVG element
+    var svg = d3.select(selector).append("svg")
+        //.attr("class","centered")
+        .attr("width", 960)
+        .attr("height", 600)
+        .append("g")
+        .attr("transform", "translate(480,300)");
+
+
+    //Draw the word cloud
+    function draw(words) {
+        var cloud = svg.selectAll("g text")
+                        .data(words, function(d) { return d.text.toLowerCase(); })
+
+        //Entering words
+        cloud.enter()
+            .append("text")
+            .style("font-family", "Impact")
+            .style("fill", function(d, i) { return fill(i); })
+            .attr("text-anchor", "middle")
+            .attr('font-size', 1)
+            .text(function(d) { return d.text; });
+
+        //Entering and existing words
+        cloud
+            .transition()
+                .duration(600)
+                .style("font-size", function(d) { return d.size + "px"; })
+                .attr("transform", function(d) {
+                    return "translate(" + [d.x, d.y] + ")rotate(" + d.rotate + ")";
+                })
+                .style("fill-opacity", 1);
+
+        //Exiting words
+        cloud.exit()
+            .transition()
+                .duration(200)
+                .style('fill-opacity', 1e-6)
+                .attr('font-size', 1)
+                .remove();
+    }
+
+
+    //Use the module pattern to encapsulate the visualisation code. We'll
+    // expose only the parts that need to be public.
+    return {
+
+        //Recompute the word cloud for a new set of words. This method will
+        // asycnhronously call draw when the layout has been computed.
+        //The outside world will need to call this function, so make it part
+        // of the wordCloud return value.
+        update: function(words,minang=0, maxang=90, orients=2) {
+            let deltaang=(maxang-minang)/(orients-1);
+            d3.layout.cloud().size([960, 600])
+                .words(words)
+                .padding(2)
+                .spiral('archimedean')
+                .rotate(function() { return minang + ~~(~~(Math.random() * orients) * deltaang) ; })
+                .font("Impact")
+                .fontSize(function(d) { return d.size; })
+                .on("end", draw)
+                .start();
+        },
+        timeout: 0
+    }
+
+}
+
+//Prepare one of the sample sentences by removing punctuation,
+// creating an array of words and computing a random size attribute.
+function getRandomWords(i) {
+    return words[i]
+            .replace(/[!\.,:;\?]/g, '')
+            .split(' ')
+            .map(function(d) {
+                return {text: d, size: 10 + Math.random() * 60};
+            })
+}
+
+function updateFromServer(vis, url='http://localhost:3001?cloud=demo') {
+    var xmlhttp = new XMLHttpRequest();
+
+    xmlhttp.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+            var wordCounts = JSON.parse(this.responseText);
+    
+            wordList=[]
+            for(word in wordCounts) {
+                wordList.push({text:word, size:wordCounts[word]})
+            }
+            vis.update(wordList,-90,90,5)
+            if (vis.timeout>0) setTimeout(function() { updateFromServer(vis,url) }, vis.timeout)
+        }
+    };
+
+    xmlhttp.open("GET", url, true);
+    xmlhttp.send();
+}
+//This method tells the word cloud to redraw with a new set of words.
+//In reality the new words would probably come from a server request,
+// user input or some other source.
+function showIntro(vis) {
+
+    //vis.update(getWords(i ++ % words.length))
+    vis.update([{text:"Hello,", size: 50},
+                {text:"welcome", size: 40},
+                {text:"to", size: 30},
+                {text:"word", size: 60},
+                {text:"cloud", size: 70},
+                {text:"dj", size: 80},
+             
+               ],-90,90,5)
+    setTimeout(function() { showIntro(vis) }, 2000)
+}
+
+function showNewWords(vis, i) {
+    i = i || 0;
+
+    //vis.update(getWords(i ++ % words.length))
+    vis.update([{text:"asd", size: 50},
+                {text:"hello", size: 70},
+                {text:"blah", size: 80},
+                {text:"word", size: 40},
+                {text:"say what", size: 30},
+                {text:"hello", size: 15},
+                {text:"great", size: 90},
+                {text:"happy", size: 10},
+             
+               ])
+    if (vis.timeout>0) setTimeout(function() { showNewWords(vis, i + 1)}, 2000)
+}
+
+//Create a new instance of the word cloud visualisation.
+var myWordCloud = wordCloud('#vis');
+
+//Start cycling through the demo data
+//showIntro(myWordCloud);
+myWordCloud.timeout=2000
+updateFromServer(myWordCloud);
+
+
+</script>
